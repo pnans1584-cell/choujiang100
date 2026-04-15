@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>限时限量砸金蛋</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body { margin: 0; background: #c0392b; font-family: "Microsoft YaHei", sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; color: white; overflow: hidden; }
+        .header { margin-top: 40px; text-align: center; }
+        .egg-container { display: flex; justify-content: center; gap: 15px; margin-top: 50px; }
+        .egg-item { width: 90px; height: 120px; cursor: pointer; transition: transform 0.1s; }
+        .egg-item:active { transform: scale(0.9); } /* 点击缩放 */
+        
+        .egg { 
+            width: 100%; height: 100%; 
+            background: radial-gradient(circle at 30% 30%, #ffdf88, #f1c40f 60%, #d4ac0d);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
+            display: flex; align-items: center; justify-content: center; font-weight: bold; color: #d4ac0d; font-size: 20px;
+        }
+        .egg.broken { background: #7f8c8d !important; opacity: 0.6; transform: scale(0.85); pointer-events: none; }
+        .status-msg { margin-top: 40px; font-size: 1rem; background: rgba(0,0,0,0.2); padding: 10px 20px; border-radius: 20px; }
+        
+        /* 核心：中奖喜报弹窗（适配截图） */
+        #poster {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(180deg, #e74c3c 0%, #c0392b 100%);
+            z-index: 1000; text-align: center; box-sizing: border-box; padding-top: 60px;
+        }
+        .poster-content {
+            background: white; width: 85%; margin: 0 auto; border-radius: 20px; padding: 30px 20px;
+            color: #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 5px solid #ffcf4d;
+        }
+        .poster-content h2 { color: #e74c3c; font-size: 28px; margin: 0; }
+        .prize-box { font-size: 24px; font-weight: bold; color: #d35400; margin: 25px 0; padding: 15px; border: 2px dashed #e67e22; border-radius: 10px; }
+        .time-stamp { font-size: 12px; color: #999; margin-top: 10px; }
+        .guide-text { margin-top: 30px; color: #ffcf4d; font-weight: bold; font-size: 18px; animation: blink 1s infinite; }
+        
+        @keyframes blink { 50% { opacity: 0.5; } }
+
+        /* 谢谢参与弹窗 */
+        #sorry-modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+            background: white; color: #333; padding: 25px; border-radius: 15px; text-align: center; z-index: 100; width: 70%;
+        }
+        .overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 99; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>🧧百岁密码群粉丝福利抽奖</h1>
+        <p>专属优惠券 8% 概率即刻开抢</p>
+    </div>
+
+    <div class="egg-container">
+        <div class="egg-item" onclick="handleDraw(this)"><div class="egg">1</div></div>
+        <div class="egg-item" onclick="handleDraw(this)"><div class="egg">2</div></div>
+        <div class="egg-item" onclick="handleDraw(this)"><div class="egg">3</div></div>
+    </div>
+
+    <div class="status-msg" id="statusText">👆 点击金蛋碰碰运气</div>
+
+    <div id="poster">
+        <div class="poster-content">
+            <h2>🎊 中奖喜报 🎊</h2>
+            <p style="margin-top:10px;">恭喜这位幸运群友</p>
+            <div class="prize-box">获得：百岁密码新品优惠券一份</div>
+            <p>凭此截图向管理员领奖</p>
+            <div class="time-stamp" id="drawTime"></div>
+        </div>
+        <div class="guide-text">📸 请截屏发送至微信群领奖</div>
+        <button onclick="location.reload()" style="margin-top:40px; background:none; border:1px solid white; color:white; padding:5px 15px; border-radius:15px; opacity:0.6;">返回</button>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+    <div id="sorry-modal">
+        <h3 style="color: #7f8c8d;">哎呀，没砸中</h3>
+        <p>手气差了一点点，下次再来吧！</p>
+        <button onclick="closeModal()" style="padding: 10px 20px; background:#e74c3c; color:white; border:none; border-radius:5px; margin-top:10px;">我知道了</button>
+    </div>
+
+    <script>
+        // --- 管理员配置区 ---
+        const ACTIVITY_CLOSED = false; // 💡 重点：一旦有人领奖，在 GitHub 把这里改为 true 并提交，全群就都结束了。
+        const WIN_RATE = 0.08;         // 8% 中奖率
+        const STORAGE_KEY = 'wechat_egg_draw_v1.1';
+
+        // 初始化礼花效果
+        function fireConfetti() {
+            // 从底部左右两侧发射
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.7, x: 0.2 } });
+            confetti({ particleCount: 150, spread: 80, origin: { y: 0.7, x: 0.8 } });
+        }
+
+        function handleDraw(element) {
+            // 1. 检查全局开关
+            if (ACTIVITY_CLOSED) {
+                alert("手慢了！奖品已被领走，活动已结束。");
+                return;
+            }
+
+            // 2. 检查个人是否抽过
+            if (localStorage.getItem(STORAGE_KEY)) {
+                alert("您已经参加过抽奖啦！");
+                return;
+            }
+
+            const egg = element.querySelector('.egg');
+            egg.innerHTML = "💥";
+            egg.classList.add('broken');
+            localStorage.setItem(STORAGE_KEY, 'true');
+
+            // 3. 概率逻辑
+            const isWinner = Math.random() < WIN_RATE;
+
+            if (isWinner) {
+                // 💡 中奖仪式感：全屏大礼花！
+                fireConfetti();
+
+                setTimeout(() => {
+                    const now = new Date();
+                    document.getElementById('drawTime').innerText = "获奖时间：" + now.toLocaleString();
+                    document.getElementById('poster').style.display = 'block';
+                    document.getElementById('statusText').innerText = "🎉 恭喜中奖！";
+                }, 500);
+            } else {
+                // 没中奖也撒一点彩纸安慰一下
+                confetti({ particleCount: 30, spread: 30, origin: { y: 0.5 } });
+
+                setTimeout(() => {
+                    document.getElementById('overlay').style.display = 'block';
+                    document.getElementById('sorry-modal').style.display = 'block';
+                    document.getElementById('statusText').innerText = "很遗憾，没中奖";
+                }, 500);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('sorry-modal').style.display = 'none';
+        }
+
+        window.onload = function() {
+            if (ACTIVITY_CLOSED) {
+                document.getElementById('statusText').innerText = "❌ 活动已圆满结束";
+                // 禁用所有蛋
+                document.querySelectorAll('.egg').forEach(el => el.classList.add('broken'));
+            } else if (localStorage.getItem(STORAGE_KEY)) {
+                document.getElementById('statusText').innerText = "您已完成抽奖";
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>群聊抽奖神器</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; background: #f7f7f7; padding: 20px; }
+        .card { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1 { color: #07c160; } /* 微信绿 */
+        #display { font-size: 3rem; font-weight: bold; margin: 40px 0; color: #e74c3c; min-height: 80px; }
+        textarea { width: 100%; height: 100px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; padding: 10px; }
+        button { background: #07c160; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 30px; cursor: pointer; width: 100%; }
+        button:active { background: #06ad56; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h1>🎉 幸运抽奖</h1>
+    <p>在下方输入名单（每行一个名字）：</p>
+    <textarea id="names">张三
+李四
+王五
+赵六
+小明</textarea>
+    
+    <div id="display">准备好了吗？</div>
+    
+    <button id="btn" onclick="toggle()">开始抽奖</button>
+</div>
+
+<script>
+    let timer = null;
+    const btn = document.getElementById('btn');
+    const display = document.getElementById('display');
+    const namesInput = document.getElementById('names');
+
+    function toggle() {
+        if (timer) {
+            // 停止
+            clearInterval(timer);
+            timer = null;
+            btn.innerText = '开始抽奖';
+            btn.style.background = '#07c160';
+            // 弹出结果
+            setTimeout(() => alert('🎊 恭喜中奖者：' + display.innerText), 100);
+        } else {
+            // 开始
+            const list = namesInput.value.split('\n').filter(n => n.trim() !== '');
+            if (list.length === 0) return alert('请输入名字');
+            
+            btn.innerText = '停！';
+            btn.style.background = '#e74c3c';
+            timer = setInterval(() => {
+                const rand = Math.floor(Math.random() * list.length);
+                display.innerText = list[rand];
+            }, 50);
+        }
+    }
+</script>
+
+</body>
+</html>

@@ -1,64 +1,197 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>群聊抽奖神器</title>
+    <title>幸运砸金蛋</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #f7f7f7; padding: 20px; }
-        .card { background: white; border-radius: 15px; padding: 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        h1 { color: #07c160; } /* 微信绿 */
-        #display { font-size: 3rem; font-weight: bold; margin: 40px 0; color: #e74c3c; min-height: 80px; }
-        textarea { width: 100%; height: 100px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #ddd; padding: 10px; }
-        button { background: #07c160; color: white; border: none; padding: 15px 40px; font-size: 1.2rem; border-radius: 30px; cursor: pointer; width: 100%; }
-        button:active { background: #06ad56; }
+        :root {
+            --primary-color: #ffcf4d;
+            --secondary-color: #e74c3c;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #c0392b; /* 喜庆红背景 */
+            font-family: "Microsoft YaHei", sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .header {
+            margin-top: 40px;
+            text-align: center;
+            color: white;
+        }
+
+        .header h1 { font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); margin-bottom: 10px; }
+
+        /* 金蛋容器 */
+        .egg-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 600px;
+            margin-top: 50px;
+            padding: 20px;
+        }
+
+        .egg-item {
+            position: relative;
+            width: 120px;
+            height: 160px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        /* 未破碎的金蛋样式 */
+        .egg {
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 30% 30%, #ffdf88, #f1c40f 60%, #d4ac0d);
+            border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2), inset -5px -10px 15px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 蛋上的“福”字或装饰 */
+        .egg::after {
+            content: "福";
+            color: rgba(212, 172, 13, 0.5);
+            font-size: 40px;
+            font-weight: bold;
+        }
+
+        /* 抖动动画 */
+        .egg-item:hover .egg {
+            animation: shake 0.5s infinite;
+        }
+
+        @keyframes shake {
+            0% { transform: rotate(0); }
+            25% { transform: rotate(5deg); }
+            50% { transform: rotate(0); }
+            75% { transform: rotate(-5deg); }
+            100% { transform: rotate(0); }
+        }
+
+        /* 破碎后的样式 */
+        .broken {
+            transform: scale(0.8);
+            opacity: 0.5;
+            background: #bdc3c7 !important;
+            pointer-events: none;
+        }
+
+        /* 结果弹窗 */
+        #result-modal {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 0 100px rgba(0,0,0,0.5);
+            z-index: 100;
+            width: 80%;
+            max-width: 300px;
+        }
+
+        .overlay {
+            display: none;
+            position: fixed;
+            top:0; left:0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7);
+            z-index: 99;
+        }
+
+        .btn-reset {
+            margin-top: 50px;
+            padding: 12px 30px;
+            background: var(--primary-color);
+            border: none;
+            border-radius: 25px;
+            font-weight: bold;
+            color: #c0392b;
+            cursor: pointer;
+        }
+
+        #winner-name {
+            font-size: 2rem;
+            color: #e74c3c;
+            margin: 20px 0;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h1>🎉 幸运抽奖</h1>
-    <p>在下方输入名单（每行一个名字）：</p>
-    <textarea id="names">张三
-李四
-王五
-赵六
-小明</textarea>
-    
-    <div id="display">准备好了吗？</div>
-    
-    <button id="btn" onclick="toggle()">开始抽奖</button>
-</div>
+    <div class="header">
+        <h1>🎉 幸运砸金蛋</h1>
+        <p>点击一个金蛋，看看你的手气！</p>
+    </div>
 
-<script>
-    let timer = null;
-    const btn = document.getElementById('btn');
-    const display = document.getElementById('display');
-    const namesInput = document.getElementById('names');
+    <div class="egg-container" id="egg-box">
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+        <div class="egg-item" onclick="breakEgg(this)"><div class="egg"></div></div>
+    </div>
 
-    function toggle() {
-        if (timer) {
-            // 停止
-            clearInterval(timer);
-            timer = null;
-            btn.innerText = '开始抽奖';
-            btn.style.background = '#07c160';
-            // 弹出结果
-            setTimeout(() => alert('🎊 恭喜中奖者：' + display.innerText), 100);
-        } else {
-            // 开始
-            const list = namesInput.value.split('\n').filter(n => n.trim() !== '');
-            if (list.length === 0) return alert('请输入名字');
+    <button class="btn-reset" onclick="location.reload()">重置所有金蛋</button>
+
+    <div class="overlay" id="overlay"></div>
+    <div id="result-modal">
+        <h2>恭喜你获得</h2>
+        <div id="winner-name">...</div>
+        <button onclick="closeModal()" style="padding: 10px 20px;">太棒了</button>
+    </div>
+
+    <script>
+        // 在这里修改你的名单
+        const prizes = ["一等奖：手机", "二等奖：耳机", "三等奖：充电宝", "谢谢参与", "红包 5 元", "神秘大礼包"];
+
+        function breakEgg(element) {
+            const egg = element.querySelector('.egg');
+            if(egg.classList.contains('broken')) return;
+
+            // 添加破碎效果
+            egg.classList.add('broken');
+            egg.innerText = "💥";
             
-            btn.innerText = '停！';
-            btn.style.background = '#e74c3c';
-            timer = setInterval(() => {
-                const rand = Math.floor(Math.random() * list.length);
-                display.innerText = list[rand];
-            }, 50);
-        }
-    }
-</script>
+            // 随机抽取一个奖项
+            const randomIndex = Math.floor(Math.random() * prizes.length);
+            const result = prizes[randomIndex];
 
+            // 延迟弹出结果
+            setTimeout(() => {
+                showResult(result);
+            }, 500);
+        }
+
+        function showResult(name) {
+            document.getElementById('winner-name').innerText = name;
+            document.getElementById('overlay').style.display = 'block';
+            document.getElementById('result-modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('overlay').style.display = 'none';
+            document.getElementById('result-modal').style.display = 'none';
+        }
+    </script>
 </body>
 </html>
